@@ -1,12 +1,12 @@
 import touch_trace
-import touch_trace_loop
+import screen_capture
 import uarm
 import time
 import json
 import screen_arm_position
 
 def get_touchtracedata(windowid,filename):
-    touch_trace_loop.screencapture(windowid,filename)
+    screen_capture.screencapture(windowid,filename)
     data = touch_trace.imgfile_to_touchtracedata(filename)
     return data
 
@@ -61,7 +61,7 @@ if __name__ == '__main__':
     assert(args.x_count>=2)
     assert(args.y_count>=2)
     
-    windowid = touch_trace_loop.get_windowid()
+    windowid = screen_capture.get_windowid()
     ttd = get_touchtracedata(windowid,args.tmp_file)
     screen_width = ttd['width']
     screen_height = ttd['height']
