@@ -23,14 +23,11 @@ class VideoCapture:
         self.timestamp_list = [0] * BUFFER_COUNT
         self.closing = False
         self.data_ready = False
-    
-    def init(self):
         self.ffmpeg_exec_path = self._ffmpeg_exec_path()
-        self.device_id = self._find_device_id()
         self.buffer = [ bytearray(self.width*self.height*4) for _ in range(BUFFER_COUNT) ]
         nd_list = [ np.frombuffer(b, np.uint8) for b in self.buffer ]
-        self.buffer_nd_list = [ np.reshape(nd,(self.height,self.width,4)) for nd in nd_list ]
-
+        self.buffer_nd_list = [ np.reshape(nd,(self.height,self.width,4))[:,:,:3] for nd in nd_list ]
+    
     def start(self):
         self.thread = threading.Thread( target=self._run )
         self.thread.start()
@@ -60,7 +57,7 @@ class VideoCapture:
                 '-nostdin',
                 '-f','avfoundation',
                 '-pixel_format','uyvy422',
-                '-i','{}:none'.format(self.device_id),
+                '-i','{}:none'.format(self.src_name),
                 '-vsync','2',
                 '-an',
                 '-vf','scale={}:{}'.format(self.width,self.height),
@@ -131,28 +128,6 @@ class VideoCapture:
         assert(os.path.isfile(path))
         return path
 
-    def _find_device_id(self):
-        test_run = subprocess.run([
-            self.ffmpeg_exec_path,
-            '-f','avfoundation',
-            '-list_devices','true',
-            '-i',''
-            ],
-            stderr=subprocess.PIPE
-        )
-        stderr_str = test_run.stderr.decode('UTF8')
-        stderr_line_list = stderr_str.split('\n')
-        src_list = []
-        for line in stderr_line_list:
-            regex = '\\[v\\] \\[(\d+)\\] \\[([^\\]]+)\\]'
-            m = re.search(regex, line)
-            if m == None:
-                continue
-            src_list.append(m.group(2))
-            if m.group(2) == self.src_name:
-                return int(m.group(1))
-        raise Exception('src \"{}\" not found, available src:{}'.format(self.src_name,src_list))
-
 if __name__ == '__main__':
     import argparse
 
@@ -163,7 +138,6 @@ if __name__ == '__main__':
     args = parser.parse_args()
 
     vc = VideoCapture(args.src_name,args.width,args.height)
-    vc.init()
     vc.start()
     vc.wait_data_ready()
     print('data_ready')
