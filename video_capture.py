@@ -28,6 +28,8 @@ class VideoCapture:
         self.ffmpeg_exec_path = self._ffmpeg_exec_path()
         self.device_id = self._find_device_id()
         self.buffer = [ bytearray(self.width*self.height*4) for _ in range(BUFFER_COUNT) ]
+        nd_list = [ np.frombuffer(b, np.uint8) for b in self.buffer ]
+        self.buffer_nd_list = [ np.reshape(nd,(self.height,self.width,4)) for nd in nd_list ]
 
     def start(self):
         self.thread = threading.Thread( target=self._run )
@@ -46,7 +48,8 @@ class VideoCapture:
             self.proc.wait()
 
     def get_frame(self):
-        return self._get_read_buf()
+        idx = self._get_read_buf_idx()
+        return self.buffer_nd_list[idx]
 
     def release_frame(self):
         self._release_read_buf()
@@ -104,7 +107,7 @@ class VideoCapture:
             assert(self.write_lock != None)
             self.write_lock = None
 
-    def _get_read_buf(self):
+    def _get_read_buf_idx(self):
         with self.lock:
             assert(self.read_lock == None)
             tmp_timestamp_list = copy.copy(self.timestamp_list)
@@ -112,7 +115,8 @@ class VideoCapture:
                 tmp_timestamp_list[self.write_lock] = 0
             idx = tmp_timestamp_list.index(max(tmp_timestamp_list))
             self.read_lock = idx
-            return self.buffer[idx]
+            #print(str(idx),file=sys.stderr)
+            return idx
 
     def _release_read_buf(self):
         with self.lock:
@@ -164,12 +168,11 @@ if __name__ == '__main__':
     vc.wait_data_ready()
     print('data_ready')
     for i in range(10):
-        print('get_frame')
-        buf = vc.get_frame()
-        ndata = np.frombuffer(buf, np.uint8)
+        #print('get_frame')
+        ndata = vc.get_frame()
+        fn = 'x{}.png'.format(i)
+        print(fn,file=sys.stderr)
+        cv2.imwrite(fn,ndata)
         vc.release_frame()
-        print(ndata.shape)
-        ndata = np.reshape(ndata, (args.height, args.width, 4) )
-        cv2.imwrite('x{}.png'.format(i),ndata)
-        time.sleep(1)
+        time.sleep(0.2)
     vc.close()
